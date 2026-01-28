@@ -2,162 +2,96 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
-    // =========================
-    // BACKEND PROXY (KURIR)
-    // =========================
+    // ================= BACKEND =================
     if (url.pathname === "/api/get-video" && request.method === "POST") {
-      try {
-        const { urls } = await request.json();
+      const { urls } = await request.json();
+      const results = [];
 
-        if (!Array.isArray(urls)) {
-          return new Response(JSON.stringify({ error: "Invalid input" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
-        const results = [];
-
-        // eksekusi BERGANTIAN
-        for (const link of urls) {
-          const res = await fetch(
-            "https://online.fliflik.com/get-video-link",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ url: link }),
-            }
-          );
-
-          const json = await res.json();
-          results.push(json.data || null);
-        }
-
-        return new Response(JSON.stringify(results), {
+      for (const link of urls) {
+        const res = await fetch("https://online.fliflik.com/get-video-link", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: link }),
         });
-      } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
+
+        const json = await res.json();
+        results.push(json.data || null);
       }
+
+      return new Response(JSON.stringify(results), {
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    // =========================
-    // FRONTEND
-    // =========================
-    return new Response(
-      `<!DOCTYPE html>
-<html lang="id">
+    // ================= FRONTEND =================
+    return new Response(`<!DOCTYPE html>
+<html>
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Video Downloader</title>
 <style>
-body {
-  background:#0f172a;
-  color:#e5e7eb;
-  font-family:Arial,sans-serif;
-  padding:20px;
-}
-textarea {
-  width:100%;
-  height:120px;
-  background:#020617;
-  color:#fff;
-  border:1px solid #334155;
-  padding:10px;
-}
-button {
-  margin-top:10px;
-  padding:10px 16px;
-  background:#2563eb;
-  color:white;
-  border:none;
-  cursor:pointer;
-}
-.grid {
-  margin-top:20px;
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
-  gap:16px;
-}
-.card {
-  background:#020617;
-  padding:10px;
-  border:1px solid #334155;
-}
-video {
-  width:100%;
-}
-a {
-  display:block;
-  margin-top:8px;
-  background:#16a34a;
-  color:white;
-  text-align:center;
-  padding:8px;
-  text-decoration:none;
-}
+body{background:#020617;color:#fff;font-family:sans-serif;padding:20px}
+textarea{width:100%;height:120px;background:#020617;color:#fff;border:1px solid #334155;padding:10px}
+button{margin-top:10px;padding:10px 16px;background:#2563eb;color:white;border:none}
+.grid{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.card{background:#020617;border:1px solid #334155;padding:10px}
+video{width:100%}
+a{display:block;margin-top:8px;background:#16a34a;color:white;text-align:center;padding:8px;text-decoration:none}
+.error{color:#f87171}
 </style>
 </head>
 <body>
 
 <h2>Video Downloader</h2>
-<p>Masukkan link (1 link per baris)</p>
+<textarea id="links" placeholder="1 link per baris"></textarea>
+<br>
+<button onclick="go()">Proses</button>
 
-<textarea id="links"></textarea>
-<br />
-<button onclick="submitLinks()">Proses</button>
-
-<div class="grid" id="result"></div>
+<div id="out" class="grid"></div>
 
 <script>
-async function submitLinks() {
-  const textarea = document.getElementById("links");
-  const links = textarea.value
-    .split("\\n")
-    .map(l => l.trim())
-    .filter(l => l);
+async function go(){
+  const out = document.getElementById("out");
+  out.innerHTML = "Loading...";
 
-  if (links.length === 0) {
-    alert("Masukkan minimal 1 link");
-    return;
-  }
-
-  document.getElementById("result").innerHTML = "Loading...";
+  const urls = document.getElementById("links").value
+    .split("\\n").map(v=>v.trim()).filter(Boolean);
 
   const res = await fetch("/api/get-video", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ urls: links })
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({urls})
   });
 
   const data = await res.json();
-  const container = document.getElementById("result");
-  container.innerHTML = "";
+  out.innerHTML = "";
 
-  data.forEach(item => {
-    if (!item || !item.url) return;
+  data.forEach(d=>{
+    let videoUrl = null;
 
-    const card = document.createElement("div");
-    card.className = "card";
+    if (d?.url) videoUrl = d.url;
+    else if (d?.video?.[0]?.url) videoUrl = d.video[0].url;
 
-    card.innerHTML = \`
-      <video controls src="\${item.url}"></video>
-      <a href="\${item.url}" download>Download</a>
-    \`;
+    const div = document.createElement("div");
+    div.className = "card";
 
-    container.appendChild(card);
+    if (!videoUrl){
+      div.innerHTML = '<div class="error">Gagal mengambil video</div>';
+    } else {
+      div.innerHTML = \`
+        <video controls src="\${videoUrl}"></video>
+        <a href="\${videoUrl}" download>Download</a>
+      \`;
+    }
+
+    out.appendChild(div);
   });
 }
 </script>
 
 </body>
-</html>`,
-      { headers: { "Content-Type": "text/html" } }
-    );
+</html>`, {
+      headers: { "Content-Type": "text/html" },
+    });
   },
 };
