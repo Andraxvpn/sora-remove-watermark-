@@ -2,7 +2,7 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
-    // ================= BACKEND =================
+    // ========= BACKEND =========
     if (url.pathname === "/api/get-video" && request.method === "POST") {
       const { urls } = await request.json();
       const results = [];
@@ -15,7 +15,7 @@ export default {
         });
 
         const json = await res.json();
-        results.push(json.data || null);
+        results.push(json.data ?? null);
       }
 
       return new Response(JSON.stringify(results), {
@@ -23,7 +23,7 @@ export default {
       });
     }
 
-    // ================= FRONTEND =================
+    // ========= FRONTEND =========
     return new Response(`<!DOCTYPE html>
 <html>
 <head>
@@ -69,8 +69,13 @@ async function go(){
   data.forEach(d=>{
     let videoUrl = null;
 
-    if (d?.url) videoUrl = d.url;
-    else if (d?.video?.[0]?.url) videoUrl = d.video[0].url;
+    if (typeof d === "string") {
+      videoUrl = d;                 // ✅ KASUS KAMU
+    } else if (d?.url) {
+      videoUrl = d.url;
+    } else if (d?.video?.[0]?.url) {
+      videoUrl = d.video[0].url;
+    }
 
     const div = document.createElement("div");
     div.className = "card";
